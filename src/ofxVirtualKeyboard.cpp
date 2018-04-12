@@ -1,6 +1,17 @@
 #include "ofxVirtualKeyboard.h"
 
-ofxVirtualKeyboard::ofxVirtualKeyboard(){}
+ofxVirtualKeyboard::ofxVirtualKeyboard()
+{
+	for (int i = 0; i < labels.size() - 1; i++)
+	{
+		RectangleKey newKey = RectangleKey();
+		newKey.label = labels[i];
+
+		keys.push_back(newKey);
+	}
+
+	enterKey.label = labels[labels.size() - 1];
+}
 
 ofxVirtualKeyboard::~ofxVirtualKeyboard()
 {
@@ -12,33 +23,32 @@ ofxVirtualKeyboard::~ofxVirtualKeyboard()
 void ofxVirtualKeyboard::setup(int width, int padding, string labelFontPath, float labelSize)
 {
     setShape(width, padding);
-    setFont(labelFontPath, labelSize);
+	setLabel(labelFontPath, labelSize);
 }
 
 void ofxVirtualKeyboard::setShape(int width, int padding)
 {
-    this->padding = padding;
+	keyboardSettings.padding = padding;
     
-    keySize = (width - padding * 11) / 13;
-    effectiveWidth = keySize * 13 + padding * 11;
-    float effectiveHeight = keySize * 4 + padding * 3;
+	keyboardSettings.keySize = (width - padding * 11) / 13;
+	keyboardSettings.effectiveWidth = keyboardSettings.keySize * 13 + padding * 11;
+    float effectiveHeight = keyboardSettings.keySize * 4 + padding * 3;
     
-    boundingBox = ofRectangle(0, 0, effectiveWidth, effectiveHeight);
+	keyboardSettings.boundingBox = ofRectangle(0, 0, keyboardSettings.effectiveWidth, effectiveHeight);
     
-    buttons = createButtons(effectiveWidth, padding, keySize);
+    createButtons(keyboardSettings.effectiveWidth, padding, keyboardSettings.keySize);
 }
 
 void ofxVirtualKeyboard::setPosition(ofVec2f position)
 {
-    translation = position;
+	keyboardSettings.translation = position;
 }
 
-void ofxVirtualKeyboard::setFont(string path, float labelSize)
+void ofxVirtualKeyboard::setLabel(string path, float labelSize)
 {
-    font.load(path, keySize / 3 * labelSize);
-    fontText.load(path, keySize / 4 * labelSize);
-    createLabels();
-
+    font.load(path, keyboardSettings.keySize / 3 * labelSize);
+    fontText.load(path, keyboardSettings.keySize / 4 * labelSize);
+    setLabelsPosition();
 }
 
 void ofxVirtualKeyboard::setColors(ofColor button, ofColor buttonDown, ofColor label, ofColor labelDown)
@@ -80,87 +90,80 @@ void ofxVirtualKeyboard::disableTouchEvents()
 
 void ofxVirtualKeyboard::onMousePressed(ofMouseEventArgs & data)
 {
-    isKeyDown(data.x, data.y);
+	labelToReturn = checkForKeyDown(data.x, data.y);
 }
 
 void ofxVirtualKeyboard::onMouseDragged(ofMouseEventArgs & data)
 {
-    isKeyDown(data.x, data.y);
+	labelToReturn = checkForKeyDown(data.x, data.y);
 }
 
 void ofxVirtualKeyboard::onMouseReleased(ofMouseEventArgs & data)
 {
-    cout << "onMouseReleased\n";
+	keyReleased();
 }
 
-void ofxVirtualKeyboard::onTouchUp(ofTouchEventArgs& data)
-{
-    cout << "onTouchUp\n";
-}
 
 void ofxVirtualKeyboard::onTouchDown(ofTouchEventArgs& data)
 {
-    cout << "onTouchDown\n";
+	labelToReturn = checkForKeyDown(data.x, data.y);
 }
 
 void ofxVirtualKeyboard::onTouchMoved(ofTouchEventArgs& data)
 {
-    cout << "onTouchMoved\n";
+	labelToReturn = checkForKeyDown(data.x, data.y);
+}
+
+void ofxVirtualKeyboard::onTouchUp(ofTouchEventArgs& data)
+{
+	keyReleased();
 }
 
 //--------------------------------------------------------------
-bool ofxVirtualKeyboard::isKeyDown(int x, int y)
+string ofxVirtualKeyboard::checkForKeyDown(int x, int y)
 {
     // Correct input position
-    int xPos = x - translation.x;
-    int yPos = y - translation.y;
-    
+    int xPos = x - keyboardSettings.translation.x;
+    int yPos = y - keyboardSettings.translation.y;
+	string label = "";
+
     // Keys
-    for (int i = 0; i < buttons.size(); i++)
+    for (int i = 0; i < keys.size(); i++)
     {
-        if (buttons[i].inside(xPos, yPos)) keyDown = i;
+		if (keys[i].button.inside(xPos, yPos))
+		{
+			keyDown = i;
+
+			// Caps Lock
+			if (keyDown == 23) isCapsLockActive = !isCapsLockActive;
+
+			// Shift
+			if (keyDown == 33) isShiftActive = true;
+
+			if ((isCapsLockActive && keyDown != 23) || (isShiftActive && keyDown != 33)) label = ofToUpper(keys[keyDown].label);
+			else label = keys[keyDown].label;
+		}
     }
     
-    // Caps Lock
-    if (keyDown == 23) isCapsLockActive = !isCapsLockActive;
-    
-    // Shift
-    if (keyDown == 33) isShiftActive = true;
-    
     // Enter
-    if (enterKeyHitter.inside(xPos, yPos)) enterKeyDown = true;
+	if (enterKey.buttonHit.inside(xPos, yPos))
+	{
+		label = enterKey.label;
+		enterKeyDown = true;
+	}
     
-    
-    if (keyDown == -1 && enterKeyDown == false) return false;
-    else return true;
+	return label;
 }
 
 string ofxVirtualKeyboard::keyReleased()
-{
-    string labelToReturn = "";
-    
-    // If it's a key
-    if (keyDown != -1)
-    {
-        if (isCapsLockActive) labelToReturn = ofToUpper(keysLabel[keyDown]);
-        else if (isShiftActive && keyDown != 33)
-        {
-            labelToReturn = ofToUpper(keysLabel[keyDown]);
-            isShiftActive = false;
-        }
-        else labelToReturn = keysLabel[keyDown];
-    }
-    
-    // If it's enter
-    if (enterKeyDown)
-    {
-        labelToReturn = keysLabel[44];
-    }
-    
-    // Reset Values
-    keyDown = -1;
-    enterKeyDown = false;
-    
+{    
+	ofNotifyEvent(keyRe, labelToReturn, this);
+
+	// Reset
+	if (keyDown != 33) isShiftActive = false;
+	keyDown = -1;
+	enterKeyDown = false;
+
     return labelToReturn;
 }
 
@@ -168,34 +171,34 @@ string ofxVirtualKeyboard::keyReleased()
 void ofxVirtualKeyboard::draw()
 {
     ofPushMatrix();
-    ofTranslate(translation.x, translation.y);
+    ofTranslate(keyboardSettings.translation.x, keyboardSettings.translation.y);
     ofPushStyle();
     ofFill();
     
-    for(int i = 0; i < buttons.size(); i++)
+    for(int i = 0; i < keys.size(); i++)
     {
         if (i == keyDown || (i == 23 && isCapsLockActive) || (i == 33 && isShiftActive)) ofSetColor(buttonDownColor);
         
         else ofSetColor(buttonColor);
-        ofDrawRectRounded(buttons[i], padding * 0.75);
+        ofDrawRectRounded(keys[i].button, keyboardSettings.padding * 0.75);
         
         if (i == keyDown || (i == 23 && isCapsLockActive) || (i == 33 && isShiftActive)) ofSetColor(labelDownColor);
         else ofSetColor(labelColor);
-        if (i == 0 || i == 11 || i == 12 || i == 23 || i == 33 || i == 43 || i == 44) fontText.drawString(keysLabel[i], fontPosition[i].x, fontPosition[i].y);
+        if (i == 0 || i == 11 || i == 12 || i == 23 || i == 33 || i == 43 || i == 44) fontText.drawString(keys[i].label, keys[i].labelPostion.x, keys[i].labelPostion.y);
         else
         {
-            if (isCapsLockActive || isShiftActive) font.drawString(ofToUpper(keysLabel[i]), fontPosition[i].x, fontPosition[i].y);
-            else font.drawString(keysLabel[i], fontPosition[i].x, fontPosition[i].y);
+            if (isCapsLockActive || isShiftActive) font.drawString(ofToUpper(keys[i].label), keys[i].labelPostion.x, keys[i].labelPostion.y);
+            else font.drawString(keys[i].label, keys[i].labelPostion.x, keys[i].labelPostion.y);
         }
     }
     
     // Enter Button
-    if (enterKeyDown) enterKeyDisplay.setFillColor(buttonDownColor);
-    else enterKeyDisplay.setFillColor(buttonColor);
-    enterKeyDisplay.draw();
+    if (enterKeyDown) enterKey.buttonDisplay.setFillColor(buttonDownColor);
+    else enterKey.buttonDisplay.setFillColor(buttonColor);
+    enterKey.buttonDisplay.draw();
     if (enterKeyDown) ofSetColor(labelDownColor);
     else ofSetColor(labelColor);
-    fontText.drawString(keysLabel[44], fontPosition[44].x, fontPosition[44].y);
+    fontText.drawString(enterKey.label, enterKey.labelPostion.x, enterKey.labelPostion.y);
     
     
     ofPopStyle();
@@ -204,10 +207,10 @@ void ofxVirtualKeyboard::draw()
 
 ofRectangle ofxVirtualKeyboard::getBoundingBox()
 {
-    return boundingBox;
+    return keyboardSettings.boundingBox;
 }
 
-vector <ofRectangle> ofxVirtualKeyboard::createButtons(int _effectiveWidth, int _padding, int _keySize)
+void ofxVirtualKeyboard::createButtons(int _effectiveWidth, int _padding, int _keySize)
 {
     vector <ofRectangle> tempButtons;
     
@@ -232,25 +235,28 @@ vector <ofRectangle> ofxVirtualKeyboard::createButtons(int _effectiveWidth, int 
         {
             keyButton.setPosition(0, _keySize + _padding);
             keyButton.setSize(_keySize + _keySize / 2, _keySize);
+			tempButtons.push_back(keyButton);
+
         }
         else
         {
             keyButton.setPosition(_keySize / 2 + i * (_keySize + _padding), _keySize + _padding);
             keyButton.setSize(_keySize, _keySize);
+			tempButtons.push_back(keyButton);
+
         }
         
-        tempButtons.push_back(keyButton);
         
         // Enter Button
         if (i == 10)
         {
-            enterKeyHitter.addVertex(keyButton.x + _keySize + _padding, _keySize + _padding);
-            enterKeyHitter.addVertex(_effectiveWidth, _keySize + _padding);
-            enterKeyHitter.addVertex(_effectiveWidth, _keySize * 3 + _padding * 2);
-            enterKeyHitter.addVertex(keyButton.x + _keySize / 2, _keySize * 3 + _padding * 2);
-            enterKeyHitter.addVertex(keyButton.x + _keySize / 2, _keySize * 2 + _padding * 2);
-            enterKeyHitter.addVertex(keyButton.x + _keySize + _padding, _keySize * 2 + _padding * 2);
-            enterKeyHitter.close();
+            enterKey.buttonHit.addVertex(keyButton.x + _keySize + _padding, _keySize + _padding);
+            enterKey.buttonHit.addVertex(_effectiveWidth, _keySize + _padding);
+            enterKey.buttonHit.addVertex(_effectiveWidth, _keySize * 3 + _padding * 2);
+            enterKey.buttonHit.addVertex(keyButton.x + _keySize / 2, _keySize * 3 + _padding * 2);
+            enterKey.buttonHit.addVertex(keyButton.x + _keySize / 2, _keySize * 2 + _padding * 2);
+            enterKey.buttonHit.addVertex(keyButton.x + _keySize + _padding, _keySize * 2 + _padding * 2);
+            enterKey.buttonHit.close();
             
             int radius = _padding * 2;
             int aX = radius + keyButton.x + _keySize + _padding;
@@ -264,25 +270,25 @@ vector <ofRectangle> ofxVirtualKeyboard::createButtons(int _effectiveWidth, int 
             int eY = _keySize * 2 + _padding * 2;
             int fX = keyButton.x + _keySize + _padding;
             
-            enterKeyDisplay.lineTo(aX, aY);
-            enterKeyDisplay.lineTo(bX, aY);
-            enterKeyDisplay.bezierTo(_effectiveWidth, aY, _effectiveWidth, aY, _effectiveWidth, bY);
+            enterKey.buttonDisplay.lineTo(aX, aY);
+            enterKey.buttonDisplay.lineTo(bX, aY);
+            enterKey.buttonDisplay.bezierTo(_effectiveWidth, aY, _effectiveWidth, aY, _effectiveWidth, bY);
             
-            enterKeyDisplay.lineTo(_effectiveWidth, cY);
-            enterKeyDisplay.bezierTo(_effectiveWidth, dY, _effectiveWidth, dY, bX, dY);
+            enterKey.buttonDisplay.lineTo(_effectiveWidth, cY);
+            enterKey.buttonDisplay.bezierTo(_effectiveWidth, dY, _effectiveWidth, dY, bX, dY);
             
-            enterKeyDisplay.lineTo(cX, dY);
-            enterKeyDisplay.bezierTo(dX, dY, dX, dY, dX, cY);
+            enterKey.buttonDisplay.lineTo(cX, dY);
+            enterKey.buttonDisplay.bezierTo(dX, dY, dX, dY, dX, cY);
             
-            enterKeyDisplay.lineTo(dX, eY + radius);
-            enterKeyDisplay.bezierTo(dX, eY, dX, eY, cX, eY);
+            enterKey.buttonDisplay.lineTo(dX, eY + radius);
+            enterKey.buttonDisplay.bezierTo(dX, eY, dX, eY, cX, eY);
             
-            enterKeyDisplay.lineTo(fX - radius, eY);
-            enterKeyDisplay.bezierTo(fX, eY, fX, eY, fX, eY - radius);
+            enterKey.buttonDisplay.lineTo(fX - radius, eY);
+            enterKey.buttonDisplay.bezierTo(fX, eY, fX, eY, fX, eY - radius);
             
-            enterKeyDisplay.lineTo(fX, bY);
-            enterKeyDisplay.bezierTo(fX, aY, fX, aY, aX, aY);
-            enterKeyDisplay.close();
+            enterKey.buttonDisplay.lineTo(fX, bY);
+            enterKey.buttonDisplay.bezierTo(fX, aY, fX, aY, aX, aY);
+            enterKey.buttonDisplay.close();
         }
     }
     
@@ -328,57 +334,60 @@ vector <ofRectangle> ofxVirtualKeyboard::createButtons(int _effectiveWidth, int 
         tempButtons.push_back(keyButton);
     }
     
-    return tempButtons;
-    
+
+	for (int i = 0; i < keys.size(); i++)
+	{
+		keys[i].button = tempButtons[i];
+	}
 }
 
-void ofxVirtualKeyboard::createLabels()
+void ofxVirtualKeyboard::setLabelsPosition()
 {
-    int fontTextX = keySize / 3;
+    int fontTextX = keyboardSettings.keySize / 3;
     int fontTextY = 0;
     ofRectangle fontRectangle;
-    ofPoint fontPositionTemp;
     
-    fontPosition.clear();
-    
+
     // Abcs # . _
-    for(int i = 0; i < buttons.size(); i++)
+    for (int i = 0; i < keys.size(); i++)
     {
-        fontRectangle = font.getStringBoundingBox(ofToUpper(keysLabel[i]), buttons[i].x, buttons[i].y);
-        fontPositionTemp.x = buttons[i].x + keySize / 2 - fontRectangle.width / 2;
-        fontPositionTemp.y = buttons[i].y + keySize / 2 + fontRectangle.height / 2;
-        fontPosition.push_back(fontPositionTemp);
+		ofPoint fontPositionTemp;
+        fontRectangle = font.getStringBoundingBox(ofToUpper(keys[i].label), keys[i].button.x, keys[i].button.y);
+        fontPositionTemp.x = keys[i].button.x + keyboardSettings.keySize / 2 - fontRectangle.width / 2;
+        fontPositionTemp.y = keys[i].button.y + keyboardSettings.keySize / 2 + fontRectangle.height / 2;
+
+        keys[i].labelPostion = fontPositionTemp;
         
         if (i == 12) fontTextY = fontPositionTemp.y;
         
         
-        if (i == 41) fontPosition[i].y = fontPosition[i].y + keySize / 4 ;
-        if (i == 42) fontPosition[i].y = fontPosition[i].y + keySize / 4;
+        if (i == 41) keys[i].labelPostion.y = keys[i].labelPostion.y + keyboardSettings.keySize / 4;
+        if (i == 42) keys[i].labelPostion.y = keys[i].labelPostion.y + keyboardSettings.keySize / 4;
     }
     
     // Backspace
-    fontRectangle = fontText.getStringBoundingBox(ofToUpper(keysLabel[11]), buttons[11].x, buttons[11].y);
-    fontPosition[11].x = buttons[11].x + buttons[11].width / 2 - fontRectangle.width;
-    fontPosition[11].y = fontTextY - keySize - padding / 2;
+    fontRectangle = fontText.getStringBoundingBox(ofToUpper(keys[11].label), keys[11].button.x, keys[11].button.y);
+    keys[11].labelPostion.x = keys[11].button.x + keys[11].button.width / 2 - fontRectangle.width;
+    keys[11].labelPostion.y = fontTextY - keyboardSettings.keySize - keyboardSettings.padding / 2;
     
     // Tab
-    fontPosition[12].x = fontTextX;
+    keys[12].labelPostion.x = fontTextX;
     
     // Caps Lock
-    fontPosition[23].x = fontTextX;
-    fontPosition[23].y = fontTextY + keySize + padding * 1.8;
+    keys[23].labelPostion.x = fontTextX;
+    keys[23].labelPostion.y = fontTextY + keyboardSettings.keySize + keyboardSettings.padding * 1.8;
     
     // Shift
-    fontPosition[33].x = fontTextX;
-    fontPosition[33].y = fontTextY + keySize * 2 + padding * 3;
+    keys[33].labelPostion.x = fontTextX;
+    keys[33].labelPostion.y = fontTextY + keyboardSettings.keySize * 2 + keyboardSettings.padding * 3;
     
-    // Hold To Cancel
     // @
-    fontRectangle = fontText.getStringBoundingBox(ofToUpper(keysLabel[43]), buttons[43].x, buttons[43].y);
-    fontPosition[43].x = buttons[43].x + buttons[43].width / 2 - fontRectangle.width / 2;
-    fontPosition[43].y = fontTextY + keySize * 2 + padding * 3;
+    fontRectangle = fontText.getStringBoundingBox(ofToUpper(keys[43].label), keys[43].button.x, keys[43].button.y);
+    keys[43].labelPostion.x = keys[43].button.x + keys[43].button.width / 2 - fontRectangle.width / 2;
+    keys[43].labelPostion.y = fontTextY + keyboardSettings.keySize * 2 + keyboardSettings.padding * 3;
     
     // Enter
-    fontPosition[44].x = fontPosition[11].x - keySize / 1.75;
-    fontPosition[44].y = fontTextY + keySize + padding * 2;
+	fontRectangle = font.getStringBoundingBox(ofToUpper(enterKey.label), enterKey.buttonHit[0].x, enterKey.buttonHit[0].y);
+	enterKey.labelPostion.x = enterKey.buttonHit[0].x + keyboardSettings.keySize / 2 - fontRectangle.width / 2;
+    enterKey.labelPostion.y = fontTextY + keyboardSettings.keySize + keyboardSettings.padding * 2;
 }

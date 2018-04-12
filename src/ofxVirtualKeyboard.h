@@ -10,6 +10,7 @@ class ofxVirtualKeyboard {
     
         // SETUP
         void setup(int width, int padding, string fontPath, float labelSize = 1.0);
+
         void setShape(int width, int padding);
         void setPosition(ofVec2f position);
         void setLabel(string fontPath, float labelSize = 1.0);
@@ -21,8 +22,10 @@ class ofxVirtualKeyboard {
         void enableTouchEvents();
         void disableTouchEvents();
     
-        bool isKeyDown(int x, int y);
+        string checkForKeyDown(int x, int y);
         string keyReleased();
+
+		ofEvent<string> keyRe;
     
         // DRAW
         void draw();
@@ -32,21 +35,44 @@ class ofxVirtualKeyboard {
         
         
     private:
+
+		struct KeyboardSettings
+		{
+			ofVec2f translation = ofVec2f(0, 0);
+			int effectiveWidth;
+			ofRectangle boundingBox;
+			int padding;
+			int keySize;
+		};
+        
+		KeyboardSettings keyboardSettings;
+
+		// SHAPE
+		// Keys
+		struct RectangleKey
+		{
+			string label;
+			ofPoint labelPostion;
+			ofRectangle button;
+		};
+
+		vector <RectangleKey> keys;
+
+        // Custom Key
+		struct CustomKey
+		{
+			string label;
+			ofPoint labelPostion;
+			ofPath buttonDisplay;
+			ofPolyline buttonHit;
+		};
+
+		CustomKey enterKey;
+        
     
-        // SHAPE
-        int padding;
-        int keySize;
-        int effectiveWidth;
-        ofRectangle boundingBox;
+
+        void createButtons(int _effectiveWidth, int _padding, int _keySize);
     
-        // Special: Enter Key
-        ofPath enterKeyDisplay;
-        ofPolyline enterKeyHitter;
-    
-        vector <ofRectangle> buttons;
-        vector <ofRectangle> createButtons(int _effectiveWidth, int _padding, int _keySize);
-    
-        ofVec2f translation = ofVec2f(0,0);
 
         // STYLE
         // Colors
@@ -58,12 +84,11 @@ class ofxVirtualKeyboard {
         // Labels
         ofTrueTypeFont font;
         ofTrueTypeFont fontText;
-        vector <ofPoint> fontPosition;
         bool loadFont = true;
     
-        void createLabels();
+        void setLabelsPosition();
 
-        vector <string> keysLabel = { "", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "<<", "", "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "Caps", "a", "s", "d", "f", "g", "h", "j", "k", "l", "Shift", "z", "x", "c", "v", "b", "n", "m", ".", "_", "@", "Enter" };
+        vector <string> labels = { "", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "<<", "", "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "Caps", "a", "s", "d", "f", "g", "h", "j", "k", "l", "Shift", "z", "x", "c", "v", "b", "n", "m", ".", "_", "@", "Enter"};
     
 
         // EVENTS & STATES
@@ -77,6 +102,9 @@ class ofxVirtualKeyboard {
         void onTouchUp(ofTouchEventArgs &data);
         void onTouchDown(ofTouchEventArgs &data);
         void onTouchMoved(ofTouchEventArgs &data);
+
+		string labelToReturn = "";
+
     
         int keyDown = -1;
         bool enterKeyDown = false;
