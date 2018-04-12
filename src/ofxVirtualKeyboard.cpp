@@ -100,7 +100,7 @@ void ofxVirtualKeyboard::onMouseDragged(ofMouseEventArgs & data)
 
 void ofxVirtualKeyboard::onMouseReleased(ofMouseEventArgs & data)
 {
-	keyReleased();
+	getVirtualKeyReleased();
 }
 
 
@@ -116,7 +116,7 @@ void ofxVirtualKeyboard::onTouchMoved(ofTouchEventArgs& data)
 
 void ofxVirtualKeyboard::onTouchUp(ofTouchEventArgs& data)
 {
-	keyReleased();
+	getVirtualKeyReleased();
 }
 
 //--------------------------------------------------------------
@@ -155,9 +155,9 @@ string ofxVirtualKeyboard::checkForKeyDown(int x, int y)
 	return label;
 }
 
-string ofxVirtualKeyboard::keyReleased()
+string ofxVirtualKeyboard::getVirtualKeyReleased()
 {    
-	ofNotifyEvent(keyRe, labelToReturn, this);
+	if (usingMouseEvents || usingTouchEvents) ofNotifyEvent(virtualKeyReleased, labelToReturn, this);
 
 	// Reset
 	if (keyDown != 33) isShiftActive = false;
@@ -178,12 +178,14 @@ void ofxVirtualKeyboard::draw()
     for(int i = 0; i < keys.size(); i++)
     {
         if (i == keyDown || (i == 23 && isCapsLockActive) || (i == 33 && isShiftActive)) ofSetColor(buttonDownColor);
-        
         else ofSetColor(buttonColor);
+
         ofDrawRectRounded(keys[i].button, keyboardSettings.padding * 0.75);
+
         
         if (i == keyDown || (i == 23 && isCapsLockActive) || (i == 33 && isShiftActive)) ofSetColor(labelDownColor);
         else ofSetColor(labelColor);
+
         if (i == 0 || i == 11 || i == 12 || i == 23 || i == 33 || i == 43 || i == 44) fontText.drawString(keys[i].label, keys[i].labelPostion.x, keys[i].labelPostion.y);
         else
         {
@@ -367,7 +369,7 @@ void ofxVirtualKeyboard::setLabelsPosition()
     
     // Backspace
     fontRectangle = fontText.getStringBoundingBox(ofToUpper(keys[11].label), keys[11].button.x, keys[11].button.y);
-    keys[11].labelPostion.x = keys[11].button.x + keys[11].button.width / 2 - fontRectangle.width;
+    keys[11].labelPostion.x = keys[11].button.x + keys[11].button.width / 2 - fontRectangle.width / 2;
     keys[11].labelPostion.y = fontTextY - keyboardSettings.keySize - keyboardSettings.padding / 2;
     
     // Tab

@@ -23,9 +23,9 @@ class ofxVirtualKeyboard {
         void disableTouchEvents();
     
         string checkForKeyDown(int x, int y);
-        string keyReleased();
+        string getVirtualKeyReleased();
 
-		ofEvent<string> keyRe;
+		ofEvent<string> virtualKeyReleased;
     
         // DRAW
         void draw();
@@ -88,7 +88,7 @@ class ofxVirtualKeyboard {
     
         void setLabelsPosition();
 
-        vector <string> labels = { "", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "<<", "", "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "Caps", "a", "s", "d", "f", "g", "h", "j", "k", "l", "Shift", "z", "x", "c", "v", "b", "n", "m", ".", "_", "@", "Enter"};
+        vector <string> labels = { "", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Backspace", "", "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "Caps", "a", "s", "d", "f", "g", "h", "j", "k", "l", "Shift", "z", "x", "c", "v", "b", "n", "m", ".", "_", "@", "Enter"};
     
 
         // EVENTS & STATES
